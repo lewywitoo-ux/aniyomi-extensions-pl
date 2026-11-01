@@ -183,6 +183,24 @@ jobs:
           fetch-depth: 0
           persist-credentials: true
 
+      - name: Update repository signing fingerprint
+        env:
+          SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
+          ALIAS: ${{ secrets.ALIAS }}
+          KEY_STORE_PASSWORD: ${{ secrets.KEY_STORE_PASSWORD }}
+        run: |
+          echo "$SIGNING_KEY" | base64 -d > signingkey.jks
+          FINGERPRINT="$(keytool -list -v -keystore signingkey.jks -storepass "$KEY_STORE_PASSWORD" -alias "$ALIAS" | awk -F': ' '/SHA1:/{print $2; exit}' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          python - "$FINGERPRINT" <<'PY'
+          import json
+          import sys
+          from pathlib import Path
+          path = Path("repo/repo.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          data["meta"]["signingKeyFingerprint"] = sys.argv[1]
+          path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\\n", encoding="utf-8")
+          PY
+
       - name: Merge repo
         env:
           DELETE: ${{ needs.prepare.outputs.delete }}
