@@ -21,8 +21,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private var pendingSearchQuery = ""
 
     override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/anime-lista/", headers)
-    override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage =
-        parseCatalog(response, "")
+    override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, "")
     override fun popularAnimeSelector(): String = throw UnsupportedOperationException()
     override fun popularAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
     override fun popularAnimeNextPageSelector(): String = throw UnsupportedOperationException()
@@ -35,8 +34,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         pendingSearchQuery = query
         return GET("$baseUrl/anime-lista/", headers)
     }
-    override fun searchAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage =
-        parseCatalog(response, pendingSearchQuery)
+    override fun searchAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, pendingSearchQuery)
     override fun searchAnimeSelector(): String = throw UnsupportedOperationException()
     override fun searchAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
     override fun searchAnimeNextPageSelector(): String = throw UnsupportedOperationException()
@@ -89,15 +87,17 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         val encoded = Regex("const hexData = \\\"([0-9a-f]+)\\\"").find(html)?.groupValues?.get(1).orEmpty()
         val json = runCatching { String(decodeHex(encoded), Charsets.UTF_8) }.getOrDefault("[]")
         val entries = runCatching { Json.decodeFromString<List<CatalogEntry>>(json) }.getOrDefault(emptyList())
-        val normalizedQuery = query.trim().lowercase()
+        val queryTerms = query.trim().lowercase().split(Regex("\\s+")).filter(String::isNotBlank)
         val results = entries.asSequence()
-            .filter { normalizedQuery.isBlank() || it.title.contains(normalizedQuery, ignoreCase = true) }
-            .map { item -> SAnime.create().apply {
-                title = item.title
-                setUrlWithoutDomain(item.url)
-                thumbnail_url = item.image
-                status = if (item.air == 1) SAnime.ONGOING else SAnime.UNKNOWN
-            } }
+            .filter { item -> queryTerms.all { term -> item.title.contains(term, ignoreCase = true) } }
+            .map { item ->
+                SAnime.create().apply {
+                    title = item.title
+                    setUrlWithoutDomain(item.url)
+                    thumbnail_url = item.image
+                    status = if (item.air == 1) SAnime.ONGOING else SAnime.UNKNOWN
+                }
+            }
             .toList()
         return eu.kanade.tachiyomi.animesource.model.AnimesPage(results, false)
     }
