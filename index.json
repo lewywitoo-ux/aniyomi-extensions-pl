@@ -18,42 +18,6 @@
     ]
   },
   {
-    "name": "Aniyomi: Anime-Odcinki",
-    "pkg": "eu.kanade.tachiyomi.animeextension.pl.animeodcinki",
-    "apk": "aniyomi-pl.animeodcinki-v14.1.apk",
-    "lang": "pl",
-    "code": 1,
-    "version": "14.1",
-    "nsfw": 1,
-    "sources": [
-      {
-        "name": "Anime-Odcinki",
-        "lang": "pl",
-        "id": "2959481969710077621",
-        "baseUrl": "https://anime-odcinki.pl",
-        "versionId": 1
-      }
-    ]
-  },
-  {
-    "name": "Aniyomi: AnimeWatch",
-    "pkg": "eu.kanade.tachiyomi.animeextension.pl.animewatch",
-    "apk": "aniyomi-pl.animewatch-v14.1.apk",
-    "lang": "pl",
-    "code": 1,
-    "version": "14.1",
-    "nsfw": 1,
-    "sources": [
-      {
-        "name": "AnimeWatch",
-        "lang": "pl",
-        "id": "1564752183367881473",
-        "baseUrl": "https://animewatch.pl",
-        "versionId": 1
-      }
-    ]
-  },
-  {
     "name": "Aniyomi: Docchi",
     "pkg": "eu.kanade.tachiyomi.animeextension.pl.docchi",
     "apk": "aniyomi-pl.docchi-v14.12.apk",
