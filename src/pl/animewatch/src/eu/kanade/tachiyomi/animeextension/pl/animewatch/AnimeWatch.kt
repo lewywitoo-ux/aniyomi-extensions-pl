@@ -6,6 +6,7 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
 import eu.kanade.tachiyomi.network.GET
+import okhttp3.Headers
 import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -15,6 +16,11 @@ class AnimeWatch : ParsedAnimeHttpSource() {
     override val baseUrl = "https://animewatch.pl"
     override val lang = "pl"
     override val supportsLatest = true
+
+    private val playerHeaders = Headers.Builder()
+        .add("Referer", "$baseUrl/")
+        .add("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
+        .build()
 
     override fun popularAnimeRequest(page: Int): Request = GET(if (page == 1) "$baseUrl/anime" else "$baseUrl/anime/page/$page/", headers)
     override fun popularAnimeSelector(): String = "article.bs"
@@ -57,7 +63,8 @@ class AnimeWatch : ParsedAnimeHttpSource() {
     override fun videoListSelector(): String = "iframe[src]"
     override fun videoFromElement(element: Element): Video {
         val url = element.absUrl("src")
-        return Video(url.substringAfter("//").substringBefore('/'), url, url)
+        val host = url.substringAfter("//").substringBefore('/')
+        return Video(host, url, url, headers = playerHeaders)
     }
     override fun videoUrlParse(document: Document): String = document.selectFirst("video source[src], video[src]")?.absUrl("src").orEmpty()
 
