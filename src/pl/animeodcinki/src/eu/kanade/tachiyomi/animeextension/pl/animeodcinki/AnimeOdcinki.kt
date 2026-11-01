@@ -17,7 +17,8 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override val lang = "pl"
     override val supportsLatest = true
 
-    override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/anime-lista/page/$page/", headers)
+    override fun popularAnimeRequest(page: Int): Request =
+        GET(if (page == 1) "$baseUrl/anime-lista/" else "$baseUrl/anime-lista/page/$page/", headers)
     override fun popularAnimeSelector(): String = "a[href*='/anime/']"
     override fun popularAnimeFromElement(element: Element): SAnime = animeFromElement(element)
     override fun popularAnimeNextPageSelector(): String = ".pagination a.next, a[rel=next]"
@@ -27,7 +28,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override fun latestUpdatesNextPageSelector(): String = "#vod-recent-anime-btn"
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request =
-        GET("$baseUrl/anime-lista/?s=${query.urlEncoded()}&page=$page", headers)
+        GET("$baseUrl/?s=${query.urlEncoded()}&page=$page", headers)
     override fun searchAnimeSelector(): String = "a[href*='/anime/']"
     override fun searchAnimeFromElement(element: Element): SAnime = animeFromElement(element)
     override fun searchAnimeNextPageSelector(): String = ".pagination a.next, a[rel=next]"
