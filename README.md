@@ -7,7 +7,7 @@ To repozytorium zawiera tylko dostępne rozszerzenia do aplikacji [Aniyomi](http
 Umieść ten link w ustawieniach repozytorium używanej aplikacji.
 
 ```
-https://raw.githubusercontent.com/Hayanek/aniyomi-extensions-pl/repo/index.min.json
+https://raw.githubusercontent.com/lewywitoo-ux/aniyomi-extensions-pl/repo/index.min.json
 ```
 
 ## Do pobrania
@@ -16,4 +16,4 @@ Jeżeli preferujesz pobranie plików APK, są one dostępne w tym [`repo`](https
 
 # Prośby/Uaktualnienie
 
-Jeśli masz prośbe albo pytania to zapraszam na serwer [`Discord`](https://discord.gg/Xn74CcJ4bk).
+Jeśli masz prośbe albo pytania to zapraszam na serwer [`Discord`](link).
