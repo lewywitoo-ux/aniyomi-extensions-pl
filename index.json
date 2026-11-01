@@ -20,10 +20,10 @@
   {
     "name": "Aniyomi: Anime-Odcinki",
     "pkg": "eu.kanade.tachiyomi.animeextension.pl.animeodcinki",
-    "apk": "aniyomi-pl.animeodcinki-v14.5.apk",
+    "apk": "aniyomi-pl.animeodcinki-v14.6.apk",
     "lang": "pl",
-    "code": 5,
-    "version": "14.5",
+    "code": 6,
+    "version": "14.6",
     "nsfw": 1,
     "sources": [
       {
