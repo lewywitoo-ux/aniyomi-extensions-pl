@@ -23,6 +23,19 @@ class AnimeWatch : ParsedAnimeHttpSource() {
         .add("User-Agent", "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36")
         .build()
 
+    // Older AnimeWatch entries may still store the retired .co host in their URLs.
+    private fun canonicalUrl(url: String): String {
+        val path = url
+            .replace(Regex("(?i)^https?://(?:www\\.)?animewatch\\.co"), "")
+            .replace(Regex("(?i)^https?://(?:www\\.)?animewatch\\.pl"), "")
+            .trimStart('/')
+        return if (path.isBlank()) "$baseUrl/" else "$baseUrl/$path"
+    }
+
+    override fun animeDetailsRequest(anime: SAnime): Request = GET(canonicalUrl(anime.url), headers)
+    override fun episodeListRequest(anime: SAnime): Request = GET(canonicalUrl(anime.url), headers)
+    override fun videoListRequest(episode: SEpisode): Request = GET(canonicalUrl(episode.url), headers)
+
     override fun popularAnimeRequest(page: Int): Request = GET(if (page == 1) "$baseUrl/anime" else "$baseUrl/anime/page/$page/", headers)
     override fun popularAnimeSelector(): String = "article.bs"
     override fun popularAnimeFromElement(element: Element): SAnime = animeFromCard(element)
