@@ -19,6 +19,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override val lang = "pl"
     override val supportsLatest = true
     private var pendingSearchQuery = ""
+    private val catalogJson = Json { ignoreUnknownKeys = true }
 
     override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/anime-lista/", headers)
     override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, "")
@@ -86,7 +87,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         val html = response.body.string()
         val encoded = Regex("const hexData = \\\"([0-9a-f]+)\\\"").find(html)?.groupValues?.get(1).orEmpty()
         val json = runCatching { String(decodeHex(encoded), Charsets.UTF_8) }.getOrDefault("[]")
-        val entries = runCatching { Json.decodeFromString<List<CatalogEntry>>(json) }.getOrDefault(emptyList())
+        val entries = runCatching { catalogJson.decodeFromString<List<CatalogEntry>>(json) }.getOrDefault(emptyList())
         val queryTerms = query.trim().lowercase().split(Regex("\\s+")).filter(String::isNotBlank)
         val results = entries.asSequence()
             .filter { item -> queryTerms.all { term -> item.title.contains(term, ignoreCase = true) } }
