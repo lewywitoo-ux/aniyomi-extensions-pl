@@ -18,6 +18,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override val baseUrl = "https://anime-odcinki.pl"
     override val lang = "pl"
     override val supportsLatest = true
+    private var pendingSearchQuery = ""
 
     override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/anime-lista/", headers)
     override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage =
@@ -30,9 +31,12 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override fun latestUpdatesFromElement(element: Element): SAnime = animeFromElement(element)
     override fun latestUpdatesNextPageSelector(): String = "#vod-recent-anime-btn"
 
-    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request = GET("$baseUrl/anime-lista/", headers)
+    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
+        pendingSearchQuery = query
+        return GET("$baseUrl/anime-lista/", headers)
+    }
     override fun searchAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage =
-        parseCatalog(response, query)
+        parseCatalog(response, pendingSearchQuery)
     override fun searchAnimeSelector(): String = throw UnsupportedOperationException()
     override fun searchAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
     override fun searchAnimeNextPageSelector(): String = throw UnsupportedOperationException()
@@ -83,7 +87,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private fun parseCatalog(response: okhttp3.Response, query: String): eu.kanade.tachiyomi.animesource.model.AnimesPage {
         val html = response.body.string()
         val encoded = Regex("const hexData = \\\"([0-9a-f]+)\\\"").find(html)?.groupValues?.get(1).orEmpty()
-        val json = runCatching { String(java.util.HexFormat.of().parseHex(encoded), Charsets.UTF_8) }.getOrDefault("[]")
+        val json = runCatching { String(decodeHex(encoded), Charsets.UTF_8) }.getOrDefault("[]")
         val entries = runCatching { Json.decodeFromString<List<CatalogEntry>>(json) }.getOrDefault(emptyList())
         val normalizedQuery = query.trim().lowercase()
         val results = entries.asSequence()
@@ -96,6 +100,13 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
             } }
             .toList()
         return eu.kanade.tachiyomi.animesource.model.AnimesPage(results, false)
+    }
+
+    private fun decodeHex(value: String): ByteArray {
+        if (value.length % 2 != 0) return ByteArray(0)
+        return ByteArray(value.length / 2) { index ->
+            value.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+        }
     }
 
     @Serializable
