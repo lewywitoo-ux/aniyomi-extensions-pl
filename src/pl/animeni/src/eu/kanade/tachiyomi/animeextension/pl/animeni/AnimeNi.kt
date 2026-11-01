@@ -86,10 +86,12 @@ class AnimeNi : ParsedAnimeHttpSource() {
         return Video(url.substringAfterLast('/').ifBlank { "Odtwarzacz" }, url, url)
     }
 
-    override fun videoUrlParse(document: Document): String =
-        document.selectFirst("video source[src], video[src]")?.let {
-            it.absUrl("src").ifBlank { it.parent()?.absUrl("src").orEmpty() }
-        }.orEmpty()
+    override fun videoUrlParse(document: Document): String {
+        val video = document.selectFirst("video source[src], video[src]") ?: return ""
+        val sourceUrl = video.absUrl("src")
+        if (sourceUrl.isNotBlank()) return sourceUrl
+        return video.parent()?.absUrl("src") ?: ""
+    }
 
     private fun animeFromCard(element: Element): SAnime {
         val link = element.selectFirst("a[href]") ?: element
