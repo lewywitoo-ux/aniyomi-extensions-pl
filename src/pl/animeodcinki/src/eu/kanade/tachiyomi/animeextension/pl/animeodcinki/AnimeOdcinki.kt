@@ -7,6 +7,8 @@ import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
 import eu.kanade.tachiyomi.network.GET
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -17,21 +19,23 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override val lang = "pl"
     override val supportsLatest = true
 
-    override fun popularAnimeRequest(page: Int): Request =
-        GET(if (page == 1) "$baseUrl/anime-lista/" else "$baseUrl/anime-lista/page/$page/", headers)
-    override fun popularAnimeSelector(): String = "a[href*='/anime/']"
-    override fun popularAnimeFromElement(element: Element): SAnime = animeFromElement(element)
-    override fun popularAnimeNextPageSelector(): String = ".pagination a.next, a[rel=next]"
+    override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/anime-lista/", headers)
+    override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage =
+        parseCatalog(response, "")
+    override fun popularAnimeSelector(): String = throw UnsupportedOperationException()
+    override fun popularAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
+    override fun popularAnimeNextPageSelector(): String = throw UnsupportedOperationException()
     override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/", headers)
     override fun latestUpdatesSelector(): String = "#vod-recent-anime-list a[href*='/anime/']"
     override fun latestUpdatesFromElement(element: Element): SAnime = animeFromElement(element)
     override fun latestUpdatesNextPageSelector(): String = "#vod-recent-anime-btn"
 
-    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request =
-        GET("$baseUrl/?s=${query.urlEncoded()}&page=$page", headers)
-    override fun searchAnimeSelector(): String = "a[href*='/anime/']"
-    override fun searchAnimeFromElement(element: Element): SAnime = animeFromElement(element)
-    override fun searchAnimeNextPageSelector(): String = ".pagination a.next, a[rel=next]"
+    override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request = GET("$baseUrl/anime-lista/", headers)
+    override fun searchAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage =
+        parseCatalog(response, query)
+    override fun searchAnimeSelector(): String = throw UnsupportedOperationException()
+    override fun searchAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
+    override fun searchAnimeNextPageSelector(): String = throw UnsupportedOperationException()
 
     override fun animeDetailsParse(document: Document): SAnime = SAnime.create().apply {
         title = document.selectFirst("h1")?.text().orEmpty()
@@ -75,6 +79,32 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
             thumbnail_url = image?.let { it.absUrl("src").ifBlank { it.absUrl("data-src") } }
         }
     }
+
+    private fun parseCatalog(response: okhttp3.Response, query: String): eu.kanade.tachiyomi.animesource.model.AnimesPage {
+        val html = response.body.string()
+        val encoded = Regex("const hexData = \\\"([0-9a-f]+)\\\"").find(html)?.groupValues?.get(1).orEmpty()
+        val json = runCatching { String(java.util.HexFormat.of().parseHex(encoded), Charsets.UTF_8) }.getOrDefault("[]")
+        val entries = runCatching { Json.decodeFromString<List<CatalogEntry>>(json) }.getOrDefault(emptyList())
+        val normalizedQuery = query.trim().lowercase()
+        val results = entries.asSequence()
+            .filter { normalizedQuery.isBlank() || it.title.contains(normalizedQuery, ignoreCase = true) }
+            .map { item -> SAnime.create().apply {
+                title = item.title
+                setUrlWithoutDomain(item.url)
+                thumbnail_url = item.image
+                status = if (item.air == 1) SAnime.ONGOING else SAnime.UNKNOWN
+            } }
+            .toList()
+        return eu.kanade.tachiyomi.animesource.model.AnimesPage(results, false)
+    }
+
+    @Serializable
+    private data class CatalogEntry(
+        @kotlinx.serialization.SerialName("t") val title: String,
+        @kotlinx.serialization.SerialName("url") val url: String,
+        @kotlinx.serialization.SerialName("img") val image: String = "",
+        @kotlinx.serialization.SerialName("air") val air: Int = 0,
+    )
 
     private fun String.urlEncoded(): String = java.net.URLEncoder.encode(this, Charsets.UTF_8.name())
 }

@@ -19,10 +19,10 @@ class AnimeNi : ParsedAnimeHttpSource() {
     override val supportsLatest = true
 
     override fun popularAnimeRequest(page: Int): Request =
-        GET("$baseUrl/anime/page/$page/", headers)
+        GET(if (page == 1) "$baseUrl/anime/" else "$baseUrl/anime/page/$page/", headers)
 
     override fun popularAnimeSelector(): String =
-        "article.item, article.items, .movies article, .anime-item"
+        "article.bs"
 
     override fun popularAnimeFromElement(element: Element): SAnime = animeFromCard(element)
 
@@ -30,7 +30,7 @@ class AnimeNi : ParsedAnimeHttpSource() {
         ".pagination .next, .pagination a[href*=/page/], a.next"
 
     override fun latestUpdatesRequest(page: Int): Request =
-        GET("$baseUrl/anime/page/$page/?order=update", headers)
+        GET(if (page == 1) "$baseUrl/anime/" else "$baseUrl/anime/page/$page/", headers)
 
     override fun latestUpdatesSelector(): String = popularAnimeSelector()
 
