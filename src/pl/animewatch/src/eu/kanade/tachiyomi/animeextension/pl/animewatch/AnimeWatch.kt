@@ -1,5 +1,6 @@
 package eu.kanade.tachiyomi.animeextension.pl.animewatch
 
+import android.util.Base64
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
@@ -60,11 +61,16 @@ class AnimeWatch : ParsedAnimeHttpSource() {
         }
     }
 
-    override fun videoListSelector(): String = "iframe[src]"
+    override fun videoListSelector(): String = "select.mirror option[value]:not([value=''])"
     override fun videoFromElement(element: Element): Video {
-        val url = element.absUrl("src")
+        val html = runCatching {
+            String(Base64.decode(element.attr("value"), Base64.DEFAULT), Charsets.UTF_8)
+        }.getOrDefault("")
+        val document = org.jsoup.Jsoup.parse(html, baseUrl)
+        val player = document.selectFirst("iframe[src]")
+        val url = player?.absUrl("src").orEmpty()
         val host = url.substringAfter("//").substringBefore('/')
-        return Video(host, url, url, headers = playerHeaders)
+        return Video(host.ifBlank { element.text() }, url, url, headers = playerHeaders)
     }
     override fun videoUrlParse(document: Document): String = document.selectFirst("video source[src], video[src]")?.absUrl("src").orEmpty()
 
