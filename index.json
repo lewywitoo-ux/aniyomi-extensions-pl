@@ -2,10 +2,10 @@
   {
     "name": "Aniyomi: AnimeNi",
     "pkg": "eu.kanade.tachiyomi.animeextension.pl.animeni",
-    "apk": "aniyomi-pl.animeni-v14.3.apk",
+    "apk": "aniyomi-pl.animeni-v14.4.apk",
     "lang": "pl",
-    "code": 3,
-    "version": "14.3",
+    "code": 4,
+    "version": "14.4",
     "nsfw": 1,
     "sources": [
       {
@@ -20,10 +20,10 @@
   {
     "name": "Aniyomi: Anime-Odcinki",
     "pkg": "eu.kanade.tachiyomi.animeextension.pl.animeodcinki",
-    "apk": "aniyomi-pl.animeodcinki-v14.9.apk",
+    "apk": "aniyomi-pl.animeodcinki-v14.10.apk",
     "lang": "pl",
-    "code": 9,
-    "version": "14.9",
+    "code": 10,
+    "version": "14.10",
     "nsfw": 1,
     "sources": [
       {
