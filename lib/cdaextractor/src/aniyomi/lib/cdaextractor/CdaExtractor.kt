@@ -56,10 +56,11 @@ class CdaExtractor(private val client: OkHttpClient) {
                     }
                 """.trimIndent().toJsonRequestBody()
                 val postHeaders = embedHeaders.newBuilder()
-                    .add("Origin", "https://www.cda.pl")
-                    .add("Referer", "https://www.cda.pl/")
-                    .add("Content-Type", "application/json")
-                    .add("X-Requested-With", "XMLHttpRequest")
+                    .header("Host", "www.cda.pl")
+                    .header("Origin", "https://www.cda.pl")
+                    .header("Referer", url)
+                    .header("Content-Type", "application/json")
+                    .header("X-Requested-With", "XMLHttpRequest")
                     .build()
                 val response = client.newCall(
                     POST("https://www.cda.pl/", headers = postHeaders, body = jsonBody),
