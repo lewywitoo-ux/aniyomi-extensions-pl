@@ -70,10 +70,19 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         }
     }
 
-    override fun videoListSelector(): String = "#vod-iframe[src], .vod-player-box iframe[src]"
+    override fun videoListSelector(): String = "#vod-player-box .vod-tab[data-token], #vod-iframe[src], .vod-player-box iframe[src]"
     override fun videoFromElement(element: Element): Video {
-        val url = element.absUrl("src")
-        return Video(url.substringAfter("//").substringBefore('/'), url, url)
+        val token = element.attr("data-token")
+        val url = if (token.isNotBlank()) {
+            runCatching {
+                val reversed = token.reversed()
+                String(Base64.decode(reversed, Base64.DEFAULT), Charsets.UTF_8)
+            }.getOrDefault("")
+        } else {
+            element.absUrl("src").takeUnless { it == "about:blank" }.orEmpty()
+        }
+        val host = url.substringAfter("//").substringBefore('/').ifBlank { element.text().ifBlank { "Serwer" } }
+        return Video(host, url, url)
     }
     override fun videoUrlParse(document: Document): String = document.selectFirst("video source[src], video[src]")?.absUrl("src").orEmpty()
 
