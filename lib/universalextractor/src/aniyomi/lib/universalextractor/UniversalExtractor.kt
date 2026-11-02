@@ -100,6 +100,10 @@ class UniversalExtractor(private val client: OkHttpClient) {
                 Log.d("UniversalExtractor", "mp4 URL: $resultUrl")
                 Video(resultUrl, "$prefix - $host: ${customQuality ?: "Mirror"}", resultUrl, origRequestHeader.newBuilder().add("referer", origRequestUrl).build()).let(::listOf)
             }
+            "googlevideo.com" in resultUrl || "/videoplayback" in resultUrl -> {
+                Log.d("UniversalExtractor", "Google video URL: $resultUrl")
+                Video(resultUrl, "$prefix - $host: ${customQuality ?: "Mirror"}", resultUrl, origRequestHeader.newBuilder().add("referer", origRequestUrl).build()).let(::listOf)
+            }
             else -> emptyList()
         }
     }
@@ -114,6 +118,6 @@ class UniversalExtractor(private val client: OkHttpClient) {
 
     companion object {
         const val TIMEOUT_SEC: Long = 10
-        private val VIDEO_REGEX by lazy { Regex(".*\\.(mp4|m3u8|mpd)(\\?.*)?$") }
+        private val VIDEO_REGEX by lazy { Regex(".*\\.(mp4|m3u8|mpd)(\\?.*)?$|.*googlevideo\\.com/.+|.*/videoplayback(\\?.*)?$") }
     }
 }
