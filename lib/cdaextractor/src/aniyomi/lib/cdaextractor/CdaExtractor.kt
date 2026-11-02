@@ -10,13 +10,12 @@ import kotlinx.serialization.json.Json
 import okhttp3.Headers
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
-import uy.kohesive.injekt.injectLazy
 import java.net.URLDecoder
 import java.nio.charset.StandardCharsets
 
 class CdaExtractor(private val client: OkHttpClient) {
 
-    private val json: Json by injectLazy()
+    private val json = Json { ignoreUnknownKeys = true }
 
     fun getVideosFromUrl(url: String, headers: Headers, prefix: String): List<Video> {
         val embedHeaders = headers.newBuilder()
