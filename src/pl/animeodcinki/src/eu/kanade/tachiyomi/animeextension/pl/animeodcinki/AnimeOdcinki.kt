@@ -1,15 +1,18 @@
 package eu.kanade.tachiyomi.animeextension.pl.animeodcinki
 
 import android.util.Base64
+import aniyomi.lib.universalextractor.UniversalExtractor
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
 import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
 import eu.kanade.tachiyomi.network.GET
+import eu.kanade.tachiyomi.util.asJsoup
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Request
+import okhttp3.Response
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 
@@ -21,6 +24,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private var pendingSearchQuery = ""
     private var pendingPage = 1
     private val catalogJson = Json { ignoreUnknownKeys = true }
+    private val universalExtractor by lazy { UniversalExtractor(client) }
 
     override fun popularAnimeRequest(page: Int): Request {
         pendingPage = page
@@ -31,7 +35,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override fun popularAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
     override fun popularAnimeNextPageSelector(): String = throw UnsupportedOperationException()
     override fun latestUpdatesRequest(page: Int): Request = GET("$baseUrl/", headers)
-    override fun latestUpdatesSelector(): String = "#vod-recent-anime-list a[href*='/anime/']"
+    override fun latestUpdatesSelector(): String = ".season-item[href*='/anime/'], #vod-recent-anime-list a[href*='/anime/']"
     override fun latestUpdatesFromElement(element: Element): SAnime = animeFromElement(element)
     override fun latestUpdatesNextPageSelector(): String = "#vod-recent-anime-btn"
 
@@ -70,19 +74,25 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         }
     }
 
-    override fun videoListSelector(): String = "#vod-player-box .vod-tab[data-token], #vod-iframe[src], .vod-player-box iframe[src]"
-    override fun videoFromElement(element: Element): Video {
-        val token = element.attr("data-token")
-        val url = if (token.isNotBlank()) {
-            runCatching {
-                val reversed = token.reversed()
-                String(Base64.decode(reversed, Base64.DEFAULT), Charsets.UTF_8)
+    override fun videoListParse(response: Response): List<Video> {
+        val document = response.asJsoup()
+        val referer = response.request.url.toString()
+        val playerHeaders = headers.newBuilder().add("Referer", referer).build()
+        return document.select("#vod-player-box .vod-tab[data-token]").flatMap { tab ->
+            val playerUrl = runCatching {
+                String(Base64.decode(tab.attr("data-token").reversed(), Base64.DEFAULT), Charsets.UTF_8)
             }.getOrDefault("")
-        } else {
-            element.absUrl("src").takeUnless { it == "about:blank" }.orEmpty()
-        }
-        val host = url.substringAfter("//").substringBefore('/').ifBlank { element.text().ifBlank { "Serwer" } }
-        return Video(host, url, url)
+            if (playerUrl.startsWith("http")) {
+                universalExtractor.videosFromUrl(playerUrl, playerHeaders, prefix = tab.text().trim())
+            } else {
+                emptyList()
+            }
+        }.distinctBy { it.url }
+    }
+
+    override fun videoListSelector(): String = throw UnsupportedOperationException()
+    override fun videoFromElement(element: Element): Video {
+        throw UnsupportedOperationException()
     }
     override fun videoUrlParse(document: Document): String = document.selectFirst("video source[src], video[src]")?.absUrl("src").orEmpty()
 
