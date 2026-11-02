@@ -36,12 +36,13 @@ class CdaExtractor(private val client: OkHttpClient) {
 
         val playerData = document.selectFirst("div[player_data]")?.attr("player_data") ?: return emptyList()
         val data = json.decodeFromString<PlayerData>(playerData)
-        return data.video.qualities.map { quality ->
-            if (quality.value == data.video.quality && quality.value != "lq") {
-                val videoUrl = decryptFile(data.video.file)
-                Video(videoUrl, "${prefix}cda.pl - ${quality.key}", videoUrl)
-            } else {
-                val jsonBody = """
+        return data.video.qualities.mapNotNull { quality ->
+            runCatching {
+                if (quality.value == data.video.quality && data.video.file.isNotBlank() && quality.value != "lq") {
+                    val videoUrl = decryptFile(data.video.file)
+                    Video(videoUrl, "${prefix}cda.pl - ${quality.key}", videoUrl)
+                } else {
+                    val jsonBody = """
                     {
                         "jsonrpc": "2.0",
                         "method": "videoGetLink",
@@ -54,22 +55,25 @@ class CdaExtractor(private val client: OkHttpClient) {
                             {}
                         ]
                     }
-                """.trimIndent().toJsonRequestBody()
-                val postHeaders = embedHeaders.newBuilder()
-                    .set("Host", "www.cda.pl")
-                    .set("Origin", "https://www.cda.pl")
-                    .set("Referer", url)
-                    .set("Content-Type", "application/json")
-                    .set("X-Requested-With", "XMLHttpRequest")
-                    .build()
-                val response = client.newCall(
-                    POST("https://www.cda.pl/", headers = postHeaders, body = jsonBody),
-                ).execute()
-                val parsed = json.decodeFromString<PostResponse>(
-                    response.body.string(),
-                )
-                Video(parsed.result.resp, "${prefix}cda.pl - ${quality.key}", parsed.result.resp)
+                    """.trimIndent().toJsonRequestBody()
+                    val postHeaders = embedHeaders.newBuilder()
+                        .set("Host", "www.cda.pl")
+                        .set("Origin", "https://www.cda.pl")
+                        .set("Referer", url)
+                        .set("Content-Type", "application/json")
+                        .set("X-Requested-With", "XMLHttpRequest")
+                        .build()
+                    val response = client.newCall(
+                        POST("https://www.cda.pl/", headers = postHeaders, body = jsonBody),
+                    ).execute()
+                    if (!response.isSuccessful) return@runCatching null
+                    val parsed = json.decodeFromString<PostResponse>(response.body.string())
+                    parsed.result.resp.takeIf(String::isNotBlank)?.let {
+                        Video(it, "${prefix}cda.pl - ${quality.key}", it)
+                    }
+                }
             }
+                .getOrNull()
         }
     }
 
