@@ -19,10 +19,14 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     override val lang = "pl"
     override val supportsLatest = true
     private var pendingSearchQuery = ""
+    private var pendingPage = 1
     private val catalogJson = Json { ignoreUnknownKeys = true }
 
-    override fun popularAnimeRequest(page: Int): Request = GET("$baseUrl/anime-lista/", headers)
-    override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, "")
+    override fun popularAnimeRequest(page: Int): Request {
+        pendingPage = page
+        return GET("$baseUrl/anime-lista/", headers)
+    }
+    override fun popularAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, "", pendingPage)
     override fun popularAnimeSelector(): String = throw UnsupportedOperationException()
     override fun popularAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
     override fun popularAnimeNextPageSelector(): String = throw UnsupportedOperationException()
@@ -33,9 +37,10 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
 
     override fun searchAnimeRequest(page: Int, query: String, filters: AnimeFilterList): Request {
         pendingSearchQuery = query
+        pendingPage = page
         return GET("$baseUrl/anime-lista/", headers)
     }
-    override fun searchAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, pendingSearchQuery)
+    override fun searchAnimeParse(response: okhttp3.Response): eu.kanade.tachiyomi.animesource.model.AnimesPage = parseCatalog(response, pendingSearchQuery, pendingPage)
     override fun searchAnimeSelector(): String = throw UnsupportedOperationException()
     override fun searchAnimeFromElement(element: Element): SAnime = throw UnsupportedOperationException()
     override fun searchAnimeNextPageSelector(): String = throw UnsupportedOperationException()
@@ -83,14 +88,19 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         }
     }
 
-    private fun parseCatalog(response: okhttp3.Response, query: String): eu.kanade.tachiyomi.animesource.model.AnimesPage {
+    private fun parseCatalog(response: okhttp3.Response, query: String, page: Int): eu.kanade.tachiyomi.animesource.model.AnimesPage {
         val html = response.body.string()
         val encoded = Regex("const hexData = \\\"([0-9a-f]+)\\\"").find(html)?.groupValues?.get(1).orEmpty()
         val json = runCatching { String(decodeHex(encoded), Charsets.UTF_8) }.getOrDefault("[]")
         val entries = runCatching { catalogJson.decodeFromString<List<CatalogEntry>>(json) }.getOrDefault(emptyList())
         val queryTerms = query.trim().lowercase().split(Regex("\\s+")).filter(String::isNotBlank)
-        val results = entries.asSequence()
+        val matches = entries.asSequence()
             .filter { item -> queryTerms.all { term -> item.title.contains(term, ignoreCase = true) } }
+            .toList()
+        val pageSize = 50
+        val results = matches.asSequence()
+            .drop((page - 1).coerceAtLeast(0) * pageSize)
+            .take(pageSize)
             .map { item ->
                 SAnime.create().apply {
                     title = item.title
@@ -100,7 +110,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
                 }
             }
             .toList()
-        return eu.kanade.tachiyomi.animesource.model.AnimesPage(results, false)
+        return eu.kanade.tachiyomi.animesource.model.AnimesPage(results, matches.size > page * pageSize)
     }
 
     private fun decodeHex(value: String): ByteArray {
