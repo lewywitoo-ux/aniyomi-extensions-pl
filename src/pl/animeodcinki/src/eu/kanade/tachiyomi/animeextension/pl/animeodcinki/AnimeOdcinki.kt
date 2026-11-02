@@ -2,6 +2,8 @@ package eu.kanade.tachiyomi.animeextension.pl.animeodcinki
 
 import android.util.Base64
 import aniyomi.lib.cdaextractor.CdaExtractor
+import aniyomi.lib.sibnetextractor.SibnetExtractor
+import aniyomi.lib.vkextractor.VkExtractor
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
@@ -26,6 +28,8 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private var pendingPage = 1
     private val catalogJson = Json { ignoreUnknownKeys = true }
     private val cdaExtractor by lazy { CdaExtractor(client) }
+    private val vkExtractor by lazy { VkExtractor(client, headers) }
+    private val sibnetExtractor by lazy { SibnetExtractor(client) }
 
     override fun popularAnimeRequest(page: Int): Request {
         pendingPage = page
@@ -84,15 +88,24 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
                 String(Base64.decode(tab.attr("data-token").reversed(), Base64.DEFAULT), Charsets.UTF_8)
             }.getOrDefault("")
             val label = tab.text().trim()
-            playerUrl.takeIf { it.startsWith("http") && ("cda.pl" in it || label.contains("CDA", ignoreCase = true)) }
-                ?.let { Triple(it, label, playerHeaders) }
+            playerUrl.takeIf { it.startsWith("http") }?.let { Triple(it, label, playerHeaders) }
         }
-        val videos = servers.parallelCatchingFlatMapBlocking { (url, label, requestHeaders) ->
-            val prefix = if (label.isBlank()) "" else "$label - "
-            runCatching { cdaExtractor.getVideosFromUrl(url, requestHeaders, prefix) }
-                .getOrDefault(emptyList())
-        }.distinctBy { it.url }
-        return videos.sortedWith(compareByDescending<Video> { qualityRank(it.quality) }.thenBy { it.quality })
+        fun matching(host: String, label: String) = servers.filter { (url, name, _) ->
+            host in url || name.contains(label, ignoreCase = true)
+        }
+        val cdaVideos = matching("cda.pl", "CDA").flatMap { (url, label, requestHeaders) ->
+            runCatching { cdaExtractor.getVideosFromUrl(url, requestHeaders, "$label - ") }.getOrDefault(emptyList())
+        }
+        if (cdaVideos.isNotEmpty()) return sortedVideos(cdaVideos)
+
+        val vkVideos = matching("vk.com", "VK").ifEmpty { matching("vkvideo.ru", "VK") }
+            .parallelCatchingFlatMapBlocking { (url, label, _) -> vkExtractor.videosFromUrl(url, "$label - ") }
+        if (vkVideos.isNotEmpty()) return sortedVideos(vkVideos)
+
+        val sibnetVideos = matching("sibnet.ru", "Sibnet").flatMap { (url, label, _) ->
+            runCatching { sibnetExtractor.videosFromUrl(url, "$label - ") }.getOrDefault(emptyList())
+        }
+        return sortedVideos(sibnetVideos)
     }
 
     override fun videoListSelector(): String = throw UnsupportedOperationException()
@@ -104,6 +117,9 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         val height = Regex("(?i)(\\d{3,4})\\s*p?").find(quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0
         return if (height <= 1080) height else 1080 - (height - 1080)
     }
+
+    private fun sortedVideos(videos: List<Video>): List<Video> =
+        videos.distinctBy { it.url }.sortedWith(compareByDescending<Video> { qualityRank(it.quality) }.thenBy { it.quality })
     override fun videoUrlParse(document: Document): String = document.selectFirst("video source[src], video[src]")?.absUrl("src").orEmpty()
 
     private fun animeFromElement(element: Element): SAnime {
