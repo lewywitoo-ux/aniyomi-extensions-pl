@@ -2,11 +2,6 @@ package eu.kanade.tachiyomi.animeextension.pl.animeodcinki
 
 import android.util.Base64
 import aniyomi.lib.cdaextractor.CdaExtractor
-import aniyomi.lib.googledriveextractor.GoogleDriveExtractor
-import aniyomi.lib.sibnetextractor.SibnetExtractor
-import aniyomi.lib.universalextractor.UniversalExtractor
-import aniyomi.lib.vkextractor.VkExtractor
-import aniyomi.lib.youruploadextractor.YourUploadExtractor
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
@@ -30,12 +25,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private var pendingSearchQuery = ""
     private var pendingPage = 1
     private val catalogJson = Json { ignoreUnknownKeys = true }
-    private val universalExtractor by lazy { UniversalExtractor(client) }
     private val cdaExtractor by lazy { CdaExtractor(client) }
-    private val driveExtractor by lazy { GoogleDriveExtractor(client, headers) }
-    private val sibnetExtractor by lazy { SibnetExtractor(client) }
-    private val vkExtractor by lazy { VkExtractor(client, headers) }
-    private val yourUploadExtractor by lazy { YourUploadExtractor(client) }
 
     override fun popularAnimeRequest(page: Int): Request {
         pendingPage = page
@@ -93,30 +83,14 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
             val playerUrl = runCatching {
                 String(Base64.decode(tab.attr("data-token").reversed(), Base64.DEFAULT), Charsets.UTF_8)
             }.getOrDefault("")
-            playerUrl.takeIf { it.startsWith("http") }?.let { Triple(it, tab.text().trim(), playerHeaders) }
+            val label = tab.text().trim()
+            playerUrl.takeIf { it.startsWith("http") && ("cda.pl" in it || label.contains("CDA", ignoreCase = true)) }
+                ?.let { Triple(it, label, playerHeaders) }
         }
         val videos = servers.parallelCatchingFlatMapBlocking { (url, label, requestHeaders) ->
             val prefix = if (label.isBlank()) "" else "$label - "
-            val extracted = runCatching {
-                when {
-                "drive.google.com" in url -> {
-                    val id = Regex("/d/([a-zA-Z0-9_-]+)").find(url)?.groupValues?.get(1)
-                    if (id != null) driveExtractor.videosFromUrl(id, "${prefix}Google Drive - ") else emptyList()
-                }
-                "cda.pl" in url -> cdaExtractor.getVideosFromUrl(url, requestHeaders, prefix)
-                "sibnet.ru" in url -> sibnetExtractor.videosFromUrl(url, prefix)
-                "vk.com" in url || "vkvideo.ru" in url -> vkExtractor.videosFromUrl(url, prefix)
-                "yourupload.com" in url -> yourUploadExtractor.videoFromUrl(url, requestHeaders, prefix = prefix)
-                else -> universalExtractor.videosFromUrl(url, requestHeaders, prefix = prefix)
-                }
-            }.getOrDefault(emptyList())
-            if (extracted.isNotEmpty()) {
-                extracted
-            } else {
-                runCatching {
-                    universalExtractor.videosFromUrl(url, requestHeaders, prefix = prefix)
-                }.getOrDefault(emptyList())
-            }
+            runCatching { cdaExtractor.getVideosFromUrl(url, requestHeaders, prefix) }
+                .getOrDefault(emptyList())
         }.distinctBy { it.url }
         return videos.sortedWith(compareByDescending<Video> { qualityRank(it.quality) }.thenBy { it.quality })
     }
