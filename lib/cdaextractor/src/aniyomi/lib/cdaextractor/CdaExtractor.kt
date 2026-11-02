@@ -34,9 +34,8 @@ class CdaExtractor(private val client: OkHttpClient) {
 
         if (document.toString().contains(deletedMessage)) return emptyList()
 
-        val data = json.decodeFromString<PlayerData>(
-            document.selectFirst("div[player_data]")!!.attr("player_data"),
-        )
+        val playerData = document.selectFirst("div[player_data]")?.attr("player_data") ?: return emptyList()
+        val data = json.decodeFromString<PlayerData>(playerData)
         return data.video.qualities.map { quality ->
             if (quality.value == data.video.quality && quality.value != "lq") {
                 val videoUrl = decryptFile(data.video.file)
@@ -56,12 +55,12 @@ class CdaExtractor(private val client: OkHttpClient) {
                         ]
                     }
                 """.trimIndent().toJsonRequestBody()
-                val postHeaders = Headers.headersOf(
-                    "Content-Type",
-                    "application/json",
-                    "X-Requested-With",
-                    "XMLHttpRequest",
-                )
+                val postHeaders = embedHeaders.newBuilder()
+                    .add("Origin", "https://www.cda.pl")
+                    .add("Referer", "https://www.cda.pl/")
+                    .add("Content-Type", "application/json")
+                    .add("X-Requested-With", "XMLHttpRequest")
+                    .build()
                 val response = client.newCall(
                     POST("https://www.cda.pl/", headers = postHeaders, body = jsonBody),
                 ).execute()
