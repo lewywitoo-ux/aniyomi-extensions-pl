@@ -6,6 +6,7 @@ import aniyomi.lib.googledriveextractor.GoogleDriveExtractor
 import aniyomi.lib.sibnetextractor.SibnetExtractor
 import aniyomi.lib.universalextractor.UniversalExtractor
 import aniyomi.lib.vkextractor.VkExtractor
+import aniyomi.lib.youruploadextractor.YourUploadExtractor
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
@@ -34,6 +35,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private val driveExtractor by lazy { GoogleDriveExtractor(client, headers) }
     private val sibnetExtractor by lazy { SibnetExtractor(client) }
     private val vkExtractor by lazy { VkExtractor(client, headers) }
+    private val yourUploadExtractor by lazy { YourUploadExtractor(client) }
 
     override fun popularAnimeRequest(page: Int): Request {
         pendingPage = page
@@ -104,6 +106,7 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
                 "cda.pl" in url -> cdaExtractor.getVideosFromUrl(url, requestHeaders, prefix)
                 "sibnet.ru" in url -> sibnetExtractor.videosFromUrl(url, prefix)
                 "vk.com" in url || "vkvideo.ru" in url -> vkExtractor.videosFromUrl(url, prefix)
+                "yourupload.com" in url -> yourUploadExtractor.videoFromUrl(url, requestHeaders, prefix = prefix)
                 else -> universalExtractor.videosFromUrl(url, requestHeaders, prefix = prefix)
                 }
             }.getOrDefault(emptyList())
