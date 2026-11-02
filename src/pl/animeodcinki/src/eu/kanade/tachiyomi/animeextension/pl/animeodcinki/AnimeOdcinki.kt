@@ -105,8 +105,17 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
 
     private fun decodeHex(value: String): ByteArray {
         if (value.length % 2 != 0) return ByteArray(0)
+        fun nibble(char: Char): Int = when (char) {
+            in '0'..'9' -> char.code - '0'.code
+            in 'a'..'f' -> char.code - 'a'.code + 10
+            in 'A'..'F' -> char.code - 'A'.code + 10
+            else -> -1
+        }
+        if (value.any { nibble(it) < 0 }) return ByteArray(0)
         return ByteArray(value.length / 2) { index ->
-            value.substring(index * 2, index * 2 + 2).toInt(16).toByte()
+            val high = nibble(value[index * 2])
+            val low = nibble(value[index * 2 + 1])
+            ((high shl 4) or low).toByte()
         }
     }
 
