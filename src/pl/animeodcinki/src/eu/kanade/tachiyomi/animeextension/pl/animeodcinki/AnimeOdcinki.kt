@@ -1,7 +1,11 @@
 package eu.kanade.tachiyomi.animeextension.pl.animeodcinki
 
 import android.util.Base64
+import aniyomi.lib.cdaextractor.CdaExtractor
+import aniyomi.lib.googledriveextractor.GoogleDriveExtractor
+import aniyomi.lib.sibnetextractor.SibnetExtractor
 import aniyomi.lib.universalextractor.UniversalExtractor
+import aniyomi.lib.vkextractor.VkExtractor
 import eu.kanade.tachiyomi.animesource.model.AnimeFilterList
 import eu.kanade.tachiyomi.animesource.model.SAnime
 import eu.kanade.tachiyomi.animesource.model.SEpisode
@@ -9,6 +13,7 @@ import eu.kanade.tachiyomi.animesource.model.Video
 import eu.kanade.tachiyomi.animesource.online.ParsedAnimeHttpSource
 import eu.kanade.tachiyomi.network.GET
 import eu.kanade.tachiyomi.util.asJsoup
+import keiyoushi.utils.parallelCatchingFlatMapBlocking
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import okhttp3.Request
@@ -25,6 +30,10 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
     private var pendingPage = 1
     private val catalogJson = Json { ignoreUnknownKeys = true }
     private val universalExtractor by lazy { UniversalExtractor(client) }
+    private val cdaExtractor by lazy { CdaExtractor(client) }
+    private val driveExtractor by lazy { GoogleDriveExtractor(client, headers) }
+    private val sibnetExtractor by lazy { SibnetExtractor(client) }
+    private val vkExtractor by lazy { VkExtractor(client, headers) }
 
     override fun popularAnimeRequest(page: Int): Request {
         pendingPage = page
@@ -78,21 +87,36 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         val document = response.asJsoup()
         val referer = response.request.url.toString()
         val playerHeaders = headers.newBuilder().add("Referer", referer).build()
-        return document.select("#vod-player-box .vod-tab[data-token]").flatMap { tab ->
+        val servers = document.select("#vod-player-box .vod-tab[data-token]").mapNotNull { tab ->
             val playerUrl = runCatching {
                 String(Base64.decode(tab.attr("data-token").reversed(), Base64.DEFAULT), Charsets.UTF_8)
             }.getOrDefault("")
-            if (playerUrl.startsWith("http")) {
-                universalExtractor.videosFromUrl(playerUrl, playerHeaders, prefix = tab.text().trim())
-            } else {
-                emptyList()
+            playerUrl.takeIf { it.startsWith("http") }?.let { Triple(it, tab.text().trim(), playerHeaders) }
+        }
+        val videos = servers.parallelCatchingFlatMapBlocking { (url, label, requestHeaders) ->
+            val prefix = if (label.isBlank()) "" else "$label - "
+            when {
+                "drive.google.com" in url -> {
+                    val id = Regex("/d/([a-zA-Z0-9_-]+)").find(url)?.groupValues?.get(1)
+                    if (id != null) driveExtractor.videosFromUrl(id, "${prefix}Google Drive - ") else emptyList()
+                }
+                "cda.pl" in url -> cdaExtractor.getVideosFromUrl(url, requestHeaders, prefix)
+                "sibnet.ru" in url -> sibnetExtractor.videosFromUrl(url, prefix)
+                "vk.com" in url || "vkvideo.ru" in url -> vkExtractor.videosFromUrl(url, prefix)
+                else -> universalExtractor.videosFromUrl(url, requestHeaders, prefix = prefix)
             }
         }.distinctBy { it.url }
+        return videos.sortedWith(compareByDescending<Video> { qualityRank(it.quality) }.thenBy { it.quality })
     }
 
     override fun videoListSelector(): String = throw UnsupportedOperationException()
     override fun videoFromElement(element: Element): Video {
         throw UnsupportedOperationException()
+    }
+
+    private fun qualityRank(quality: String): Int {
+        val height = Regex("(?i)(\\d{3,4})\\s*p?").find(quality)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+        return if (height <= 1080) height else 1080 - (height - 1080)
     }
     override fun videoUrlParse(document: Document): String = document.selectFirst("video source[src], video[src]")?.absUrl("src").orEmpty()
 

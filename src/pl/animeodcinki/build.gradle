@@ -1,12 +1,16 @@
 ext {
     extName = 'Anime-Odcinki'
     extClass = '.AnimeOdcinki'
-    extVersionCode = 11
+    extVersionCode = 12
     isNsfw = true
 }
 
 apply plugin: "kei.plugins.extension.legacy"
 
 dependencies {
+    implementation(project(':lib:cdaextractor'))
+    implementation(project(':lib:googledriveextractor'))
+    implementation(project(':lib:sibnetextractor'))
     implementation(project(':lib:universalextractor'))
+    implementation(project(':lib:vkextractor'))
 }
