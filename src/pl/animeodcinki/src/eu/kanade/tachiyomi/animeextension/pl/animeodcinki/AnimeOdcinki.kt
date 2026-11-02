@@ -95,7 +95,8 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
         }
         val videos = servers.parallelCatchingFlatMapBlocking { (url, label, requestHeaders) ->
             val prefix = if (label.isBlank()) "" else "$label - "
-            when {
+            val extracted = runCatching {
+                when {
                 "drive.google.com" in url -> {
                     val id = Regex("/d/([a-zA-Z0-9_-]+)").find(url)?.groupValues?.get(1)
                     if (id != null) driveExtractor.videosFromUrl(id, "${prefix}Google Drive - ") else emptyList()
@@ -104,6 +105,14 @@ class AnimeOdcinki : ParsedAnimeHttpSource() {
                 "sibnet.ru" in url -> sibnetExtractor.videosFromUrl(url, prefix)
                 "vk.com" in url || "vkvideo.ru" in url -> vkExtractor.videosFromUrl(url, prefix)
                 else -> universalExtractor.videosFromUrl(url, requestHeaders, prefix = prefix)
+                }
+            }.getOrDefault(emptyList())
+            if (extracted.isNotEmpty()) {
+                extracted
+            } else {
+                runCatching {
+                    universalExtractor.videosFromUrl(url, requestHeaders, prefix = prefix)
+                }.getOrDefault(emptyList())
             }
         }.distinctBy { it.url }
         return videos.sortedWith(compareByDescending<Video> { qualityRank(it.quality) }.thenBy { it.quality })
